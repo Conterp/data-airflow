@@ -1,17 +1,43 @@
 version: "3.8"
 
 services:
+  postgres-dev:
+    image: postgres:15
+    container_name: airflow-postgres-dev
+    environment:
+      - POSTGRES_USER=devadmin 
+      - POSTGRES_PASSWORD=devadmin
+      - POSTGRES_DB=airflow-db 
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    # em dev não precisa expor porta pra fora, a não ser que queira conectar com algum cliente
+    # ports:
+    #   - "5432:5432"
+    restart: unless-stopped
+
   airflow-dev:
     image: apache/airflow:2.10.0
     container_name: airflow-dev
+    user: "0:0"                      # <--- roda como root (apenas em DEV)
     command: standalone
+    depends_on:
+      - postgres-dev
     environment:
       - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - PYTHONWARNINGS=ignore::SyntaxWarning
+      # agora usando Postgres como metadata DB
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://devadmin:devadmin@postgres-dev:5432/airflow-db
     ports:
       - "8080:8080"
     volumes:
       - ../dags:/opt/airflow/dags
-      - ../logs:/opt/airflow/logs
+      # em dev deixamos logs só dentro do container pra não ter dor de cabeça com permissão:
+      # - ../logs:/opt/airflow/logs
       - ../plugins:/opt/airflow/plugins
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
