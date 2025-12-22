@@ -4,7 +4,7 @@ x-airflow-common: &airflow-common
   image: apache/airflow:2.9.3
   restart: unless-stopped
   env_file:
-    - .env
+    - ../.env
   environment:
     # Core
     AIRFLOW__CORE__EXECUTOR: ${AIRFLOW__CORE__EXECUTOR:-LocalExecutor}
