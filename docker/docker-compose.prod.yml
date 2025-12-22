@@ -6,9 +6,23 @@ x-airflow-common: &airflow-common
   env_file:
     - .env
   environment:
+    # Core
     AIRFLOW__CORE__EXECUTOR: ${AIRFLOW__CORE__EXECUTOR:-LocalExecutor}
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+
+    # ============================
+    # 📌 Remote logging -> S3
+    # ============================
+    AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
+    AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: ${AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER}   # s3://bucket/prefix
+    AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: ${AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID}          # ex: aws_default
+    AIRFLOW__LOGGING__ENCRYPT_S3_LOGS: ${AIRFLOW__LOGGING__ENCRYPT_S3_LOGS:-"False"}
+
+    # Opcional: apagar cópia local depois de subir pro S3
+    # (em Airflow 2.6+ isso é feito via remote_task_handler_kwargs)
+    AIRFLOW__LOGGING__REMOTE_TASK_HANDLER_KWARGS: ${AIRFLOW__LOGGING__REMOTE_TASK_HANDLER_KWARGS:-""}
+
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -40,4 +54,11 @@ services:
         --firstname \"$${AIRFLOW_ADMIN_FIRSTNAME}\"
         --lastname \"$${AIRFLOW_ADMIN_LASTNAME}\"
         --email \"$${AIRFLOW_ADMIN_EMAIL}\"
+      ;
+
+      # (Opcional, mas recomendado) cria/garante a conexão AWS usada no remote logging
+      # Usa credenciais do ambiente (ex.: IAM Role da EC2) e define a região no conn-uri
+      airflow connections add \"$${AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID}\"
+        --conn-uri \"aws://@/?region_name=$${AWS_REGION}\"
+      || true
       "

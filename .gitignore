@@ -2,7 +2,7 @@
 # 🔒 Secrets / configs
 # ============================
 .env
-.env.*
+.env.dev
 secrets.json
 
 # ============================
