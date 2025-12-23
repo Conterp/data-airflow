@@ -1,4 +1,4 @@
-version: "3.8"
+# version: "3.8"  # (opcional) Compose moderno ignora isso
 
 x-airflow-common: &airflow-common
   image: apache/airflow:2.9.3
@@ -15,50 +15,75 @@ x-airflow-common: &airflow-common
     # 📌 Remote logging -> S3
     # ============================
     AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
-    AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: ${AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER}   # s3://bucket/prefix
-    AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: ${AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID}          # ex: aws_default
+    AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: ${AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER}
+    AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: ${AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID}
     AIRFLOW__LOGGING__ENCRYPT_S3_LOGS: ${AIRFLOW__LOGGING__ENCRYPT_S3_LOGS:-"False"}
 
-    # Opcional: apagar cópia local depois de subir pro S3
-    # (em Airflow 2.6+ isso é feito via remote_task_handler_kwargs)
+    # (opcional) apagar cópia local depois de subir pro S3
     AIRFLOW__LOGGING__REMOTE_TASK_HANDLER_KWARGS: ${AIRFLOW__LOGGING__REMOTE_TASK_HANDLER_KWARGS:-""}
 
+  # ✅ volumes apontando pra raiz do repo, não pra /docker/*
   volumes:
-    - ./dags:/opt/airflow/dags
-    - ./logs:/opt/airflow/logs
-    - ./plugins:/opt/airflow/plugins
+    - ../dags:/opt/airflow/dags
+    - ../logs:/opt/airflow/logs
+    - ../plugins:/opt/airflow/plugins
+
   user: "${AIRFLOW_UID:-50000}:0"
 
 services:
+  # ==========================================================
+  # 🗄️ POSTGRES TEMPORÁRIO (REMOVER QUANDO ENTRAR O RDS)
+  # ==========================================================
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # não expor porta em prod, a menos que você precise acessar de fora
+    # ports:
+    #   - "5432:5432"
+
   airflow-webserver:
     <<: *airflow-common
     command: webserver
     ports:
       - "8080:8080"
+    depends_on:
+      - postgres
 
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
+    depends_on:
+      - postgres
 
   airflow-init:
     <<: *airflow-common
     restart: "no"
     entrypoint: /bin/bash
-    command: >
-      -c "
-      airflow db migrate &&
-      airflow users create
-        --role Admin
-        --username \"$${AIRFLOW_ADMIN_USERNAME}\"
-        --password \"$${AIRFLOW_ADMIN_PASSWORD}\"
-        --firstname \"$${AIRFLOW_ADMIN_FIRSTNAME}\"
-        --lastname \"$${AIRFLOW_ADMIN_LASTNAME}\"
-        --email \"$${AIRFLOW_ADMIN_EMAIL}\"
-      ;
+    depends_on:
+      - postgres
+    command:
+      - -c
+      - |
+          airflow db migrate
 
-      # (Opcional, mas recomendado) cria/garante a conexão AWS usada no remote logging
-      # Usa credenciais do ambiente (ex.: IAM Role da EC2) e define a região no conn-uri
-      airflow connections add \"$${AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID}\"
-        --conn-uri \"aws://@/?region_name=$${AWS_REGION}\"
-      || true
-      "
+          airflow users create \
+            --role Admin \
+            --username "${AIRFLOW_ADMIN_USERNAME}" \
+            --password "${AIRFLOW_ADMIN_PASSWORD}" \
+            --firstname "${AIRFLOW_ADMIN_FIRSTNAME}" \
+            --lastname "${AIRFLOW_ADMIN_LASTNAME}" \
+            --email "${AIRFLOW_ADMIN_EMAIL}" || true
+
+          # cria/garante a conexão AWS do remote logging (usa IAM Role da EC2)
+          airflow connections add "${AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID}" \
+            --conn-uri "aws://@/?region_name=${AWS_REGION}" || true
+
+volumes:
+  # volume do Postgres (REMOVER quando entrar RDS)
+  postgres_data:
