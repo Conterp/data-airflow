@@ -19,9 +19,6 @@ x-airflow-common: &airflow-common
     AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: ${AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID}
     AIRFLOW__LOGGING__ENCRYPT_S3_LOGS: ${AIRFLOW__LOGGING__ENCRYPT_S3_LOGS:-"False"}
 
-    # (opcional) apagar cópia local depois de subir pro S3
-    AIRFLOW__LOGGING__REMOTE_TASK_HANDLER_KWARGS: ${AIRFLOW__LOGGING__REMOTE_TASK_HANDLER_KWARGS:-""}
-
   # ✅ volumes apontando pra raiz do repo, não pra /docker/*
   volumes:
     - ../dags:/opt/airflow/dags
