@@ -28,42 +28,20 @@ x-airflow-common: &airflow-common
   user: "${AIRFLOW_UID:-50000}:0"
 
 services:
-  # ==========================================================
-  # 🗄️ POSTGRES TEMPORÁRIO (REMOVER QUANDO ENTRAR O RDS)
-  # ==========================================================
-  postgres:
-    image: postgres:15
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    # não expor porta em prod, a menos que você precise acessar de fora
-    # ports:
-    #   - "5432:5432"
-
   airflow-webserver:
     <<: *airflow-common
     command: webserver
     ports:
       - "8080:8080"
-    depends_on:
-      - postgres
 
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
-    depends_on:
-      - postgres
 
   airflow-init:
     <<: *airflow-common
     restart: "no"
     entrypoint: /bin/bash
-    depends_on:
-      - postgres
     command:
       - -c
       - |
@@ -80,7 +58,3 @@ services:
           # cria/garante a conexão AWS do remote logging (usa IAM Role da EC2)
           airflow connections add "${AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID}" \
             --conn-uri "aws://@/?region_name=${AWS_REGION}" || true
-
-volumes:
-  # volume do Postgres (REMOVER quando entrar RDS)
-  postgres_data:
