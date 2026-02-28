@@ -27,7 +27,7 @@ x-airflow-common: &airflow-common
     - /opt/automations:/opt/automations
     - /var/run/docker.sock:/var/run/docker.sock
 
-  user: "${AIRFLOW_UID:-50000}:0"
+  user: "0:0"
 
 services:
   airflow-webserver:

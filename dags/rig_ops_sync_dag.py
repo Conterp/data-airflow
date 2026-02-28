@@ -26,7 +26,8 @@ with DAG(
     run_rig_pipeline = BashOperator(
         task_id="run_rig_pipeline",
         bash_command="""
-        cd /opt/automations/conterp-rig-ops-sync && \
-        docker compose run --rm app
+        docker run --rm \
+          --env-file /opt/automations/conterp-rig-ops-sync/.env \
+          conterp-rig-ops-sync-app
         """,
     )
