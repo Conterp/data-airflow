@@ -29,7 +29,7 @@ with DAG(
         task_id="run_veloe_sync_pipeline",
         bash_command="""
 docker run --rm \
-  --env-file /opt/automations/veloe_sync/.env \
+  --env-file /opt/automations/veloe-sync/.env \
   conterp-veloe-sync-app:latest
 """,
     )
